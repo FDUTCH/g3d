@@ -17,6 +17,8 @@
 package main
 
 import (
+	"image"
+	"image/color"
 	"log"
 
 	"github.com/gogpu/g3d"
@@ -62,6 +64,15 @@ func main() {
 	})
 	scene.Add(sun.LightNode())
 
+	img := image.NewRGBA(image.Rect(4, 0, 4, 0))
+	for x := range 4 {
+		for y := range 4 {
+			if x-y%2 == 0 {
+				img.Set(x, y, color.Black)
+			}
+		}
+	}
+
 	// Mesh: a unit cube with PBR material (metallic-roughness model).
 	cube := g3d.NewMesh(
 		g3d.NewBoxGeometry(1, 1, 1),
@@ -69,6 +80,7 @@ func main() {
 			g3d.WithColor(g3d.RGB(0.4, 0.7, 1.0)),
 			g3d.WithMetallic(0.3),
 			g3d.WithRoughness(0.6),
+			g3d.WithTexture("huy"),
 		),
 	)
 	scene.Add(cube.MeshNode())
@@ -116,6 +128,11 @@ func main() {
 			if err != nil {
 				log.Fatalf("g3d: create renderer: %v", err)
 			}
+			err = renderer.AddTextureAsImage(img, "huy", false)
+			if err != nil {
+				ctx.Renderer().LoadTexture()
+				panic(err)
+			}
 		}
 
 		// Update the renderer's internal depth texture to match the current
@@ -129,7 +146,7 @@ func main() {
 			return // Surface not available (minimized window)
 		}
 
-		if err := renderer.Render(ctx, scene, camera, view); err != nil {
+		if err := renderer.Render(scene, camera, view); err != nil {
 			log.Printf("g3d: render error: %v", err)
 		}
 	})
