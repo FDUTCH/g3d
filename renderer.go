@@ -8,7 +8,6 @@ import (
 
 	"github.com/gogpu/g3d/internal/gpu"
 	"github.com/gogpu/g3d/internal/render"
-	"github.com/gogpu/gogpu"
 	"github.com/gogpu/gpucontext"
 	"github.com/gogpu/gputypes"
 	"github.com/gogpu/wgpu"
@@ -54,8 +53,8 @@ type Renderer struct {
 	objectUniformBufs   []*wgpu.Buffer // per-mesh model+normal matrix
 	materialUniformBufs []*wgpu.Buffer // per-mesh material properties
 
-	textures     map[string]*gogpu.Texture
-	emptyTexture *gogpu.Texture
+	textures     map[string]*Texture
+	emptyTexture *Texture
 
 	objectBindGroups []*wgpu.BindGroup // per-mesh bind group (group 1)
 
@@ -85,7 +84,7 @@ func NewRenderer(provider gpucontext.DeviceProvider) (*Renderer, error) {
 		gpuState:    gpu.NewGPUState(),
 		renderList:  render.NewRenderList(),
 		depthFormat: gputypes.TextureFormatDepth24Plus,
-		textures:    make(map[string]*gogpu.Texture),
+		textures:    make(map[string]*Texture),
 	}
 
 	if err := r.gpuState.SetDeviceProvider(provider); err != nil {
@@ -113,7 +112,7 @@ func NewRendererFromDevice(
 		renderList:    render.NewRenderList(),
 		depthFormat:   gputypes.TextureFormatDepth24Plus,
 		surfaceFormat: surfaceFormat,
-		textures:      make(map[string]*gogpu.Texture),
+		textures:      make(map[string]*Texture),
 	}
 
 	if err := r.gpuState.SetDeviceDirect(device, queue); err != nil {
@@ -144,7 +143,7 @@ func (r *Renderer) SetSize(width, height uint32) {
 //
 // GPU buffers are persistent (created once, updated via queue.WriteBuffer).
 // Pipeline creation is lazy and cached.
-func (r *Renderer) Render(ctx *gogpu.Context, scene *Scene, camera Camera, targetView *wgpu.TextureView) error {
+func (r *Renderer) Render(scene *Scene, camera Camera, targetView *wgpu.TextureView) error {
 	if err := r.validateRenderState(); err != nil {
 		return err
 	}
@@ -154,7 +153,7 @@ func (r *Renderer) Render(ctx *gogpu.Context, scene *Scene, camera Camera, targe
 		return fmt.Errorf("g3d: create command encoder: %w", err)
 	}
 
-	if err := r.RenderTo(ctx, encoder, scene, camera, targetView); err != nil {
+	if err := r.RenderTo(device, encoder, scene, camera, targetView); err != nil {
 		encoder.DiscardEncoding()
 		return err
 	}
@@ -178,7 +177,7 @@ func (r *Renderer) Render(ctx *gogpu.Context, scene *Scene, camera Camera, targe
 // must keep them valid through submission and must not use the encoder
 // concurrently.
 func (r *Renderer) RenderTo(
-	ctx *gogpu.Context,
+	device *wgpu.Device,
 	encoder *wgpu.CommandEncoder,
 	scene *Scene,
 	camera Camera,
@@ -200,7 +199,8 @@ func (r *Renderer) RenderTo(
 		return err
 	}
 	if r.emptyTexture == nil {
-		tex, err := ctx.Renderer().NewTextureFromRGBA(1, 1, []byte{0xff, 0xff, 0xff, 0xff})
+
+		tex, err := r.createTexture(device, []byte{0xff, 0xff, 0xff, 0xff}, DefaultTextureOptions(), 2, 2)
 		if err != nil {
 			return fmt.Errorf("g3d: unable to create empty texture error: %w", err)
 		}
@@ -473,7 +473,7 @@ func (r *Renderer) recordDrawCall(
 		return fmt.Errorf("write material uniforms[%d]: %w", idx, err)
 	}
 
-	tex, err := r.textureById(mesh.texture)
+	tex, err := r.textureById(mat.TextureID())
 	if err != nil {
 		tex = r.emptyTexture
 	}
@@ -492,8 +492,8 @@ func (r *Renderer) recordDrawCall(
 		Entries: []wgpu.BindGroupEntry{
 			{Binding: 0, Buffer: r.objectUniformBufs[idx], Size: uint64(len(objBytes))},
 			{Binding: 1, Buffer: r.materialUniformBufs[idx], Size: uint64(len(matBytes))},
-			{Binding: 2, TextureView: tex.View()},
-			{Binding: 3, Sampler: tex.Sampler()},
+			{Binding: 2, TextureView: tex.view},
+			{Binding: 3, Sampler: tex.sampler},
 		},
 	})
 	if err != nil {
@@ -751,8 +751,7 @@ func (r *Renderer) releasePersistentResources() {
 	r.materialUniformBufs = nil
 
 	if r.emptyTexture != nil {
-		r.emptyTexture.Handle().Release()
-		r.emptyTexture.View().Release()
+		r.emptyTexture.Release()
 		r.emptyTexture = nil
 	}
 

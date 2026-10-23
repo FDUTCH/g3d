@@ -20,7 +20,6 @@ type Mesh struct {
 	node     Node
 	geometry Geometry
 	material Material
-	texture  string
 }
 
 // NewMesh creates a Mesh from a Geometry and a Material. The internal Node is
@@ -37,12 +36,6 @@ func NewMesh(geometry Geometry, material Material) *Mesh {
 	m.node.SetName("Mesh")
 	// Store self as UserData so the renderer can discover meshes during scene traversal.
 	m.node.SetUserData(m)
-	return m
-}
-
-// WithTexture adds texture to the mesh.
-func (m *Mesh) WithTexture(texture string) *Mesh {
-	m.texture = texture
 	return m
 }
 
