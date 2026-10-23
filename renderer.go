@@ -200,7 +200,7 @@ func (r *Renderer) RenderTo(
 	}
 	if r.emptyTexture == nil {
 
-		tex, err := r.createTexture(device, []byte{0xff, 0xff, 0xff, 0xff}, DefaultTextureOptions(), 2, 2)
+		tex, err := r.createTexture(device, []byte{0xff, 0xff, 0xff, 0xff}, DefaultTextureOptions(), 1, 1)
 		if err != nil {
 			return fmt.Errorf("g3d: unable to create empty texture error: %w", err)
 		}
