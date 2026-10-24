@@ -136,7 +136,7 @@ func (r *Renderer) createTexture(device *wgpu.Device, data []byte, opts TextureO
 }
 
 // AddTextureAsImage adds texture as image.
-func (r *Renderer) AddTextureAsImage(device *wgpu.Device, img *image.RGBA, id string, smooth bool) error {
+func (r *Renderer) AddTextureAsImage(img *image.RGBA, id string, smooth bool) error {
 	if _, has := r.textures[id]; has {
 		return fmt.Errorf("texture with id: %s is already loaded", id)
 	}
@@ -151,7 +151,7 @@ func (r *Renderer) AddTextureAsImage(device *wgpu.Device, img *image.RGBA, id st
 		opts.MinFilter = gputypes.FilterModeNearest
 	}
 
-	texture, err := r.createTexture(device, img.Pix, opts, width, height)
+	texture, err := r.createTexture(r.gpuState.Device(), img.Pix, opts, width, height)
 	if err != nil {
 		return err
 	}
